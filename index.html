@@ -366,10 +366,19 @@ const nextCtx    = nextCanvas.getContext('2d');
 const NEXT_SIZE    = BLOCK * 3;
 const PREVIEW_BLOCK = Math.floor(BLOCK * 0.75);
 
-board.width       = COLS * BLOCK;
-board.height      = ROWS * BLOCK;
-nextCanvas.width  = NEXT_SIZE;
-nextCanvas.height = NEXT_SIZE;
+const DPR = window.devicePixelRatio || 1;
+
+board.width       = COLS * BLOCK * DPR;
+board.height      = ROWS * BLOCK * DPR;
+board.style.width  = COLS * BLOCK + 'px';
+board.style.height = ROWS * BLOCK + 'px';
+ctx.scale(DPR, DPR);
+
+nextCanvas.width  = NEXT_SIZE * DPR;
+nextCanvas.height = NEXT_SIZE * DPR;
+nextCanvas.style.width  = NEXT_SIZE + 'px';
+nextCanvas.style.height = NEXT_SIZE + 'px';
+nextCtx.scale(DPR, DPR);
 
 // Apply theme to page
 document.body.style.background = THEME.body;
