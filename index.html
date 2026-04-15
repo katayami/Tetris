@@ -641,11 +641,11 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyR') { startGame(); return; }
   if (e.key === 'Escape') { togglePause(); return; }
   if (!running || paused) return;
-  if      (e.key === 'ArrowLeft'  || e.key === 'a') { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} }
-  else if (e.key === 'ArrowRight' || e.key === 'd') { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} }
-  else if (e.key === 'ArrowDown'  || e.key === 's') {
+  if      (e.key === 'ArrowLeft'  || e.code === 'KeyA') { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} }
+  else if (e.key === 'ArrowRight' || e.code === 'KeyD') { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} }
+  else if (e.key === 'ArrowDown'  || e.code === 'KeyS') {
     const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0;
-  } else if (e.key === 'ArrowUp'  || e.key === 'w') {
+  } else if (e.key === 'ArrowUp'  || e.code === 'KeyW') {
     const rot=rotate(piece.shape);
     let m={...piece,shape:rot};
     if(!valid(m)) m={...m,x:m.x-1};
