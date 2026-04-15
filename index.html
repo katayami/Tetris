@@ -324,6 +324,7 @@
   <table id="lb-table"><tbody id="lb-body"></tbody></table>
   <div style="display:flex;gap:12px;margin-top:4px;">
     <button id="lb-restart" class="hidden">Restart</button>
+    <button id="lb-refresh">↻ Обновить</button>
     <button id="lb-close">Закрыть</button>
   </div>
 </div>
@@ -809,6 +810,7 @@ document.getElementById('lb-close').addEventListener('click', () => {
     togglePause();
   }
 });
+document.getElementById('lb-refresh').addEventListener('click', () => loadLeaderboard(playerName));
 document.getElementById('lb-restart').addEventListener('click', () => {
   hideLeaderboard();
   startGame();
