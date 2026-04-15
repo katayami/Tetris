@@ -128,6 +128,36 @@
     }
     .ctrl-btn:active { background: rgba(255,255,255,0.18); transform: scale(0.92); }
 
+    /* ── Mute button ─────────────────────────────────────────────────────── */
+    .mute-swatch {
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 6px !important;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #333;
+      color: #e0e0e0;
+      line-height: 1;
+    }
+    .mute-swatch.muted {
+      background: #1a1a1a;
+      color: #444;
+      border-color: transparent !important;
+      position: relative;
+    }
+    .mute-swatch.muted::after {
+      content: '';
+      position: absolute;
+      left: 20%;
+      right: 20%;
+      top: 50%;
+      height: 2px;
+      background: #555;
+      transform: rotate(-45deg);
+    }
+
     /* ── Mobile layout ───────────────────────────────────────────────────── */
     @media (max-width: 700px), (pointer: coarse) {
       body {
@@ -194,6 +224,10 @@
     <div>
       <div class="label">Color</div>
       <div id="palette-wrap"></div>
+    </div>
+    <div>
+      <div class="label">Sound</div>
+      <div id="mute-btn" class="swatch mute-swatch active">♪</div>
     </div>
   </div>
 </div>
@@ -358,6 +392,7 @@ function lock() {
       if (ny < 0) { endGame(); return; }
       grid[ny][piece.x + c] = piece.shape[r][c];
     }
+  SFX.lock();
   clearLines();
   piece = nextPiece;
   nextPiece = randomPiece();
@@ -371,6 +406,7 @@ function clearLines() {
     else r--;
   }
   if (!cleared) return;
+  SFX.clear(cleared);
   const pts = [0, 100, 300, 500, 800];
   score += (pts[cleared] || 800) * level;
   lines += cleared;
@@ -511,6 +547,7 @@ function startGame() {
 function endGame() {
   running = false;
   cancelAnimationFrame(animId);
+  SFX.over();
   document.getElementById('msg-title').textContent = 'Game Over';
   document.getElementById('msg-sub').textContent = `score: ${score}`;
   document.getElementById('msg-btn').textContent = 'Restart';
@@ -522,8 +559,8 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyR') { startGame(); return; }
   if (e.key === 'Escape') { togglePause(); return; }
   if (!running || paused) return;
-  if      (e.key === 'ArrowLeft'  || e.key === 'a') { const m={...piece,x:piece.x-1}; if(valid(m)) piece=m; }
-  else if (e.key === 'ArrowRight' || e.key === 'd') { const m={...piece,x:piece.x+1}; if(valid(m)) piece=m; }
+  if      (e.key === 'ArrowLeft'  || e.key === 'a') { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} }
+  else if (e.key === 'ArrowRight' || e.key === 'd') { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} }
   else if (e.key === 'ArrowDown'  || e.key === 's') {
     const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0;
   } else if (e.key === 'ArrowUp'  || e.key === 'w') {
@@ -531,7 +568,7 @@ document.addEventListener('keydown', e => {
     let m={...piece,shape:rot};
     if(!valid(m)) m={...m,x:m.x-1};
     if(!valid(m)) m={...m,x:m.x+2};
-    if(valid(m)) piece=m;
+    if(valid(m)){piece=m;SFX.rotate();}
   } else if (e.key === ' ') {
     e.preventDefault();
     while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1};
@@ -544,12 +581,12 @@ document.getElementById('msg-btn').addEventListener('click', startGame);
 // ── Mobile buttons ────────────────────────────────────────────────────────────
 function mobileAction(action) {
   if (!running || paused) return;
-  if (action === 'left')   { const m={...piece,x:piece.x-1}; if(valid(m)) piece=m; draw(); }
-  if (action === 'right')  { const m={...piece,x:piece.x+1}; if(valid(m)) piece=m; draw(); }
+  if (action === 'left')   { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} draw(); }
+  if (action === 'right')  { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} draw(); }
   if (action === 'down')   { const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0; draw(); }
   if (action === 'rotate') {
     const rot=rotate(piece.shape); let m={...piece,shape:rot};
-    if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)) piece=m; draw();
+    if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)){piece=m;SFX.rotate();} draw();
   }
 }
 
@@ -590,6 +627,61 @@ board.addEventListener('touchend', e=>{
   } else if(ax>ay){ const m={...piece,x:piece.x+(dx>0?1:-1)}; if(valid(m)) piece=m; }
   else if(dy>30){ while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; }
 }, {passive:true});
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let muted = false;
+
+function unlockAudio() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('keydown',    unlockAudio, { once: true });
+document.addEventListener('mousedown',  unlockAudio, { once: true });
+
+function beep({ freq = 440, type = 'square', vol = 0.15, dur = 0.06, freqEnd, attack = 0.005, decay = 0.05 } = {}) {
+  if (muted || audioCtx.state === 'suspended') return;
+  const osc  = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, audioCtx.currentTime + dur);
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + attack);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + attack + decay);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + dur + 0.05);
+}
+
+const SFX = {
+  move()    { beep({ freq: 220, type: 'square', vol: 0.08, dur: 0.04, decay: 0.03 }); },
+  rotate()  { beep({ freq: 330, type: 'sine',   vol: 0.12, dur: 0.07, freqEnd: 440, decay: 0.06 }); },
+  lock()    { beep({ freq: 120, type: 'square', vol: 0.20, dur: 0.10, freqEnd: 60,  decay: 0.09 }); },
+  clear(n)  {
+    const notes = n >= 4
+      ? [523, 659, 784, 1047]   // тетрис — фанфар
+      : [523, 659, 784];        // 1-3 линии — чайм
+    notes.forEach((f, i) =>
+      setTimeout(() => beep({ freq: f, type: 'sine', vol: 0.18, dur: 0.12, decay: 0.10 }), i * 80)
+    );
+  },
+  over() {
+    [440, 330, 220, 110].forEach((f, i) =>
+      setTimeout(() => beep({ freq: f, type: 'sawtooth', vol: 0.15, dur: 0.15, freqEnd: f * 0.7, decay: 0.14 }), i * 120)
+    );
+  },
+};
+
+// Mute button
+const muteEl = document.getElementById('mute-btn');
+function toggleMute() {
+  muted = !muted;
+  muteEl.classList.toggle('muted', muted);
+}
+muteEl.addEventListener('click', toggleMute);
+muteEl.addEventListener('touchstart', e => { e.preventDefault(); toggleMute(); }, { passive: false });
 
 // Init
 applyPalette();
