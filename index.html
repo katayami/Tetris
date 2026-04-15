@@ -553,12 +553,29 @@ function mobileAction(action) {
   }
 }
 
-['left','right','down','rotate'].forEach(action => {
+['left','right','rotate'].forEach(action => {
   const el = document.getElementById('btn-' + action);
   if (!el) return;
   el.addEventListener('touchstart', e => { e.preventDefault(); mobileAction(action); }, { passive: false });
   el.addEventListener('mousedown',  e => { e.preventDefault(); mobileAction(action); });
 });
+
+// Кнопка вниз — быстрое падение при зажатии
+let downInterval = null;
+function startDown() {
+  mobileAction('down');
+  downInterval = setInterval(() => mobileAction('down'), 80);
+}
+function stopDown() {
+  clearInterval(downInterval);
+  downInterval = null;
+}
+const btnDown = document.getElementById('btn-down');
+btnDown.addEventListener('touchstart', e => { e.preventDefault(); startDown(); }, { passive: false });
+btnDown.addEventListener('touchend',   e => { e.preventDefault(); stopDown(); },  { passive: false });
+btnDown.addEventListener('mousedown',  e => { e.preventDefault(); startDown(); });
+btnDown.addEventListener('mouseup',    () => stopDown());
+btnDown.addEventListener('mouseleave', () => stopDown());
 
 // Touch swipes on canvas
 let tx=0, ty=0;
