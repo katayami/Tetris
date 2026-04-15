@@ -236,6 +236,31 @@
     }
     .ctrl-btn:active { transform: scale(0.91); box-shadow: none; }
 
+    /* ── Board wrap + Next overlay ───────────────────────────────────────── */
+    #board-wrap {
+      position: relative;
+      line-height: 0;
+    }
+
+    #next-overlay {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(245, 230, 200, 0.92);
+      border-radius: 10px;
+      padding: 6px 8px;
+      box-shadow: 0 2px 10px rgba(150, 90, 30, 0.22);
+    }
+    #next-overlay .label {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #A0724A;
+      margin-bottom: 4px;
+    }
+
     /* ── Mobile layout ───────────────────────────────────────────────────── */
     @media (max-width: 700px), (pointer: coarse) {
       body {
@@ -273,13 +298,20 @@
       .value  { font-size: 18px; }
 
       #mobile-controls { display: flex; }
+      #next-overlay { display: block; }
     }
   </style>
 </head>
 <body>
 
 <div id="app">
-  <canvas id="board"></canvas>
+  <div id="board-wrap">
+    <canvas id="board"></canvas>
+    <div id="next-overlay">
+      <div class="label">Next</div>
+      <canvas id="next-canvas-overlay"></canvas>
+    </div>
+  </div>
 
   <div id="sidebar">
     <div class="card">
@@ -364,6 +396,8 @@ const board      = document.getElementById('board');
 const ctx        = board.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
 const nextCtx    = nextCanvas.getContext('2d');
+const nextCanvasOverlay = document.getElementById('next-canvas-overlay');
+const nextCtxOverlay    = nextCanvasOverlay.getContext('2d');
 const NEXT_SIZE    = BLOCK * 3;
 const PREVIEW_BLOCK = Math.floor(BLOCK * 0.75);
 
@@ -375,19 +409,27 @@ board.style.width  = COLS * BLOCK + 'px';
 board.style.height = ROWS * BLOCK + 'px';
 ctx.scale(DPR, DPR);
 
-nextCanvas.width  = NEXT_SIZE * DPR;
-nextCanvas.height = NEXT_SIZE * DPR;
-nextCanvas.style.width  = NEXT_SIZE + 'px';
-nextCanvas.style.height = NEXT_SIZE + 'px';
-nextCtx.scale(DPR, DPR);
+function setupNextCanvas(c, ctx2d) {
+  c.width  = NEXT_SIZE * DPR;
+  c.height = NEXT_SIZE * DPR;
+  c.style.width  = NEXT_SIZE + 'px';
+  c.style.height = NEXT_SIZE + 'px';
+  ctx2d.scale(DPR, DPR);
+}
+setupNextCanvas(nextCanvas, nextCtx);
+setupNextCanvas(nextCanvasOverlay, nextCtxOverlay);
 
 // Apply theme to page
 document.body.style.background = THEME.body;
 board.style.outline = `4px solid ${THEME.border}`;
 board.style.outlineOffset = '-1px';
-nextCanvas.style.outline = `3px solid ${THEME.border}`;
-nextCanvas.style.outlineOffset = '-1px';
-nextCanvas.style.borderRadius = '8px';
+function styleNextCanvas(c) {
+  c.style.borderRadius = '8px';
+  c.style.outline = `3px solid ${THEME.border}`;
+  c.style.outlineOffset = '-1px';
+}
+styleNextCanvas(nextCanvas);
+styleNextCanvas(nextCanvasOverlay);
 document.querySelectorAll('.label').forEach(el => el.style.color = THEME.label);
 document.querySelectorAll('.value').forEach(el => el.style.color = THEME.value);
 
@@ -541,14 +583,30 @@ function draw() {
       if (piece.shape[r][c]) drawBlock(ctx, piece.x + c, piece.y + r, piece.shape[r][c], BLOCK);
 
   // Next piece
-  nextCtx.fillStyle = THEME.bg;
-  nextCtx.fillRect(0, 0, NEXT_SIZE, NEXT_SIZE);
-  const offX = Math.floor((4 - nextPiece.shape[0].length) / 2);
-  const offY = Math.floor((4 - nextPiece.shape.length) / 2);
+  drawNextPiece(nextCtx);
+  drawNextPiece(nextCtxOverlay);
+}
+
+function drawNextPiece(ctx2d) {
+  ctx2d.fillStyle = THEME.bg;
+  ctx2d.fillRect(0, 0, NEXT_SIZE, NEXT_SIZE);
+  // Bounding box по реальным блокам
+  let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+  for (let r = 0; r < nextPiece.shape.length; r++)
+    for (let c = 0; c < nextPiece.shape[r].length; c++)
+      if (nextPiece.shape[r][c]) {
+        minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+        minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+      }
+  const tx = (NEXT_SIZE - (maxC - minC + 1) * PREVIEW_BLOCK) / 2 - minC * PREVIEW_BLOCK;
+  const ty = (NEXT_SIZE - (maxR - minR + 1) * PREVIEW_BLOCK) / 2 - minR * PREVIEW_BLOCK;
+  ctx2d.save();
+  ctx2d.translate(tx, ty);
   for (let r = 0; r < nextPiece.shape.length; r++)
     for (let c = 0; c < nextPiece.shape[r].length; c++)
       if (nextPiece.shape[r][c])
-        drawBlock(nextCtx, offX + c, offY + r, nextPiece.shape[r][c], PREVIEW_BLOCK);
+        drawBlock(ctx2d, c, r, nextPiece.shape[r][c], PREVIEW_BLOCK);
+  ctx2d.restore();
 }
 
 function overlayPause() {
