@@ -349,7 +349,7 @@ const isMobile = window.innerWidth <= 700 || (('ontouchstart' in window) && wind
 
 let BLOCK;
 if (isMobile) {
-  const availH = window.innerHeight - 80 - 100 - 20;
+  const availH = window.innerHeight - 65 - 95 - 16;
   const availW = window.innerWidth - 8;
   BLOCK = Math.floor(Math.min(availH / ROWS, availW / COLS));
 } else {
@@ -718,7 +718,6 @@ const SFX = {
 const muteEl = document.getElementById('mute-btn');
 function toggleMute() {
   muted = !muted;
-  muteEl.textContent = muted ? '' : '♪';
   muteEl.classList.toggle('muted', muted);
 }
 muteEl.addEventListener('click', toggleMute);
