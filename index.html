@@ -519,7 +519,7 @@ function endGame() {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'r' || e.key === 'R') { startGame(); return; }
+  if (e.code === 'KeyR') { startGame(); return; }
   if (e.key === 'Escape') { togglePause(); return; }
   if (!running || paused) return;
   if      (e.key === 'ArrowLeft'  || e.key === 'a') { const m={...piece,x:piece.x-1}; if(valid(m)) piece=m; }
