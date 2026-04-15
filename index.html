@@ -470,6 +470,7 @@ function togglePause() {
 }
 
 function loop(ts = 0) {
+  if (!running) return;
   const delta = ts - lastTime;
   lastTime = ts;
   dropCounter += delta;
