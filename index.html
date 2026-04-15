@@ -193,38 +193,6 @@
     }
     .ctrl-btn:active { background: rgba(255,255,255,0.18); transform: scale(0.92); }
 
-    /* ── Canvas wrap + side pause button ────────────────────────────────── */
-    #canvas-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    #btn-pause {
-      display: none;
-    }
-
-    @media (max-width: 700px), (pointer: coarse) {
-      #btn-pause {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        border: 1px solid #444;
-        background: rgba(255,255,255,0.06);
-        color: #e0e0e0;
-        font-size: 16px;
-        cursor: pointer;
-        user-select: none;
-        -webkit-user-select: none;
-        touch-action: manipulation;
-        flex-shrink: 0;
-      }
-      #btn-pause:active { background: rgba(255,255,255,0.18); }
-    }
-
     /* ── Mute button ─────────────────────────────────────────────────────── */
     .mute-swatch {
       width: 40px !important;
@@ -299,10 +267,7 @@
 <body>
 
 <div id="app">
-  <div id="canvas-wrap">
-    <div id="btn-pause" class="side-btn">⏸</div>
-    <canvas id="board"></canvas>
-  </div>
+  <canvas id="board"></canvas>
 
   <div id="sidebar">
     <div>
@@ -332,6 +297,10 @@
     <div>
       <div class="label">Top</div>
       <div id="lb-btn" class="swatch mute-swatch" style="font-size:20px;">🏆</div>
+    </div>
+    <div>
+      <div class="label">Pause</div>
+      <div id="btn-pause" class="swatch mute-swatch" style="font-size:20px;">⏸</div>
     </div>
   </div>
 </div>
