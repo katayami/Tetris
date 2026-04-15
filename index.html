@@ -97,6 +97,70 @@
       transition: border-color 0.2s;
     }
     button:hover { border-color: #e0e0e0; }
+
+    /* ── Mobile controls ─────────────────────────────────────────────────── */
+    #mobile-controls {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0 6px;
+      width: 100%;
+    }
+
+    .ctrl-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .ctrl-btn {
+      width: 62px;
+      height: 62px;
+      border-radius: 12px;
+      border: 1px solid #444;
+      background: rgba(255,255,255,0.06);
+      color: #e0e0e0;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      transition: background 0.1s, transform 0.1s;
+    }
+    .ctrl-btn:active { background: rgba(255,255,255,0.18); transform: scale(0.92); }
+
+    .ctrl-btn.wide {
+      width: 136px;
+    }
+
+    /* Show on touch/small screens */
+    @media (max-width: 700px), (pointer: coarse) {
+      body { align-items: flex-start; overflow-y: auto; padding: 10px 0; }
+
+      #app {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+      }
+
+      #sidebar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 14px 24px;
+        min-width: unset;
+        width: 100%;
+        padding: 0 12px;
+        order: -1;
+      }
+
+      #mobile-controls { display: flex; }
+    }
   </style>
 </head>
 <body>
@@ -125,6 +189,21 @@
       <div class="label">Color</div>
       <div id="palette-wrap"></div>
     </div>
+  </div>
+</div>
+
+<div id="mobile-controls">
+  <div class="ctrl-row">
+    <div class="ctrl-btn" id="btn-rotate">↻</div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-btn" id="btn-left">◀</div>
+    <div class="ctrl-btn" id="btn-down">▼</div>
+    <div class="ctrl-btn" id="btn-right">▶</div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-btn wide" id="btn-drop">⬇ Drop</div>
+    <div class="ctrl-btn" id="btn-pause">⏸</div>
   </div>
 </div>
 
@@ -460,6 +539,29 @@ document.addEventListener('keydown', e => {
 });
 
 document.getElementById('msg-btn').addEventListener('click', startGame);
+
+// ── Mobile buttons ────────────────────────────────────────────────────────────
+function mobileAction(action) {
+  if (!running || paused) return;
+  if (action === 'left')   { const m={...piece,x:piece.x-1}; if(valid(m)) piece=m; draw(); }
+  if (action === 'right')  { const m={...piece,x:piece.x+1}; if(valid(m)) piece=m; draw(); }
+  if (action === 'down')   { const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0; draw(); }
+  if (action === 'rotate') {
+    const rot=rotate(piece.shape); let m={...piece,shape:rot};
+    if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)) piece=m; draw();
+  }
+  if (action === 'drop')   { while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; draw(); }
+}
+
+['left','right','down','rotate','drop'].forEach(action => {
+  const el = document.getElementById('btn-' + action);
+  if (!el) return;
+  el.addEventListener('touchstart', e => { e.preventDefault(); mobileAction(action); }, { passive: false });
+  el.addEventListener('mousedown',  e => { e.preventDefault(); mobileAction(action); });
+});
+
+document.getElementById('btn-pause').addEventListener('touchstart', e => { e.preventDefault(); togglePause(); }, { passive: false });
+document.getElementById('btn-pause').addEventListener('mousedown',  e => { e.preventDefault(); togglePause(); });
 
 // Touch
 let tx=0, ty=0;
