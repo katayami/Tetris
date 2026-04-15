@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Tetris</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -66,6 +67,7 @@
       align-items: center;
       background: rgba(0,0,0,0.85);
       gap: 14px;
+      z-index: 10;
     }
 
     #message h1 {
@@ -101,27 +103,20 @@
     /* ── Mobile controls ─────────────────────────────────────────────────── */
     #mobile-controls {
       display: none;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
       gap: 10px;
-      padding: 12px 0 6px;
+      padding: 14px 0 10px;
       width: 100%;
     }
 
-    .ctrl-row {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-    }
-
     .ctrl-btn {
-      width: 62px;
-      height: 62px;
-      border-radius: 12px;
+      width: 70px;
+      height: 70px;
+      border-radius: 14px;
       border: 1px solid #444;
       background: rgba(255,255,255,0.06);
       color: #e0e0e0;
-      font-size: 22px;
+      font-size: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -133,27 +128,42 @@
     }
     .ctrl-btn:active { background: rgba(255,255,255,0.18); transform: scale(0.92); }
 
-    /* Show on touch/small screens */
+    /* ── Mobile layout ───────────────────────────────────────────────────── */
     @media (max-width: 700px), (pointer: coarse) {
-      body { align-items: flex-start; overflow-y: auto; padding: 10px 0; }
+      body {
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        height: 100dvh;
+        overflow: hidden;
+        padding: 8px 0 0;
+      }
 
       #app {
         flex-direction: column;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         width: 100%;
+        flex: 1;
       }
 
       #sidebar {
         flex-direction: row;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 14px 24px;
+        align-items: center;
+        gap: 8px 20px;
         min-width: unset;
         width: 100%;
-        padding: 0 12px;
+        padding: 0 10px;
         order: -1;
       }
+
+      /* hide Next preview on mobile to save space */
+      #sidebar .next-block { display: none; }
+
+      .label { font-size: 8px; margin-bottom: 2px; }
+      .value  { font-size: 16px; }
 
       #mobile-controls { display: flex; }
     }
@@ -177,7 +187,7 @@
       <div class="label">Level</div>
       <div class="value" id="level">1</div>
     </div>
-    <div>
+    <div class="next-block">
       <div class="label">Next</div>
       <canvas id="next-canvas"></canvas>
     </div>
@@ -189,12 +199,10 @@
 </div>
 
 <div id="mobile-controls">
-  <div class="ctrl-row">
-    <div class="ctrl-btn" id="btn-left">◀</div>
-    <div class="ctrl-btn" id="btn-rotate">↻</div>
-    <div class="ctrl-btn" id="btn-down">▼</div>
-    <div class="ctrl-btn" id="btn-right">▶</div>
-  </div>
+  <div class="ctrl-btn" id="btn-left">◀</div>
+  <div class="ctrl-btn" id="btn-rotate">↻</div>
+  <div class="ctrl-btn" id="btn-down">▼</div>
+  <div class="ctrl-btn" id="btn-right">▶</div>
 </div>
 
 <div id="message">
@@ -208,11 +216,20 @@ const COLS = 10;
 const ROWS = 20;
 
 // ── Responsive block size ─────────────────────────────────────────────────────
-// Fit ~90% of viewport height, also constrain by width
-const BLOCK = Math.floor(Math.min(
-  (window.innerHeight * 0.90) / ROWS,
-  (window.innerWidth  * 0.58) / COLS
-));
+const isMobile = window.innerWidth <= 700 || (('ontouchstart' in window) && window.innerWidth < window.innerHeight);
+
+let BLOCK;
+if (isMobile) {
+  // Reserve ~80px for top stats, ~100px for bottom buttons, ~20px padding
+  const availH = window.innerHeight - 80 - 100 - 20;
+  const availW = window.innerWidth - 8;
+  BLOCK = Math.floor(Math.min(availH / ROWS, availW / COLS));
+} else {
+  BLOCK = Math.floor(Math.min(
+    (window.innerHeight * 0.90) / ROWS,
+    (window.innerWidth  * 0.58) / COLS
+  ));
+}
 
 const board      = document.getElementById('board');
 const ctx        = board.getContext('2d');
@@ -369,7 +386,7 @@ function updateUI() {
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
-const GAP = 2; // px gap on each side between cells
+const GAP = 2;
 
 function drawBlock(context, x, y, colorId, size) {
   const bx = x * size + GAP;
@@ -377,16 +394,13 @@ function drawBlock(context, x, y, colorId, size) {
   const bs = size - GAP * 2;
   const color = palette().blocks[colorId];
 
-  // Main fill
   context.fillStyle = color;
   context.fillRect(bx, by, bs, bs);
 
-  // Top-left highlight (subtle bevel → distinguishes adjacent same-color blocks)
   context.fillStyle = 'rgba(255,255,255,0.18)';
   context.fillRect(bx, by, bs, 3);
   context.fillRect(bx, by, 3, bs);
 
-  // Bottom-right shadow
   context.fillStyle = 'rgba(0,0,0,0.35)';
   context.fillRect(bx, by + bs - 3, bs, 3);
   context.fillRect(bx + bs - 3, by, 3, bs);
@@ -412,11 +426,9 @@ function drawGhost() {
 function draw() {
   const p = palette();
 
-  // Background
   ctx.fillStyle = p.bg;
   ctx.fillRect(0, 0, board.width, board.height);
 
-  // Grid lines — more visible than before
   ctx.strokeStyle = p.grid;
   ctx.lineWidth = 1;
   for (let c = 0; c <= COLS; c++) {
@@ -426,19 +438,16 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(0, r * BLOCK); ctx.lineTo(board.width, r * BLOCK); ctx.stroke();
   }
 
-  // Locked blocks
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
       if (grid[r][c]) drawBlock(ctx, c, r, grid[r][c], BLOCK);
 
   drawGhost();
 
-  // Active piece
   for (let r = 0; r < piece.shape.length; r++)
     for (let c = 0; c < piece.shape[r].length; c++)
       if (piece.shape[r][c]) drawBlock(ctx, piece.x + c, piece.y + r, piece.shape[r][c], BLOCK);
 
-  // Next piece preview
   nextCtx.fillStyle = p.bg;
   nextCtx.fillRect(0, 0, NEXT_SIZE, NEXT_SIZE);
   const ns = BLOCK;
@@ -542,7 +551,6 @@ function mobileAction(action) {
     const rot=rotate(piece.shape); let m={...piece,shape:rot};
     if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)) piece=m; draw();
   }
-  if (action === 'drop')   { while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; draw(); }
 }
 
 ['left','right','down','rotate'].forEach(action => {
@@ -552,7 +560,7 @@ function mobileAction(action) {
   el.addEventListener('mousedown',  e => { e.preventDefault(); mobileAction(action); });
 });
 
-// Touch
+// Touch swipes on canvas
 let tx=0, ty=0;
 board.addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
 board.addEventListener('touchend', e=>{
