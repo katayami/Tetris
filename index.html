@@ -294,6 +294,7 @@
 
       .card { padding: 6px 10px; }
       #sidebar .next-block { display: none; }
+      .timer-card { display: none; }
       .label { font-size: 8px; margin-bottom: 1px; }
       .value  { font-size: 18px; }
 
@@ -325,6 +326,10 @@
     <div class="card">
       <div class="label">Level</div>
       <div class="value" id="level">1</div>
+    </div>
+    <div class="card timer-card">
+      <div class="label">Time</div>
+      <div class="value" id="timer">0:00</div>
     </div>
     <div class="card next-block">
       <div class="label">Next</div>
@@ -446,6 +451,16 @@ const SHAPES = [
 ];
 
 let grid, piece, nextPiece, score, lines, level, dropInterval, lastTime, animId, running, paused;
+let timerStart = 0, timerElapsed = 0;
+
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function updateTimer() {
+  const el = document.getElementById('timer');
+  if (el) el.textContent = formatTime(timerElapsed + (running && !paused ? performance.now() - timerStart : 0));
+}
 
 function createGrid() {
   return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
@@ -625,8 +640,13 @@ let dropCounter = 0;
 function togglePause() {
   if (!running) return;
   paused = !paused;
-  if (paused) { cancelAnimationFrame(animId); overlayPause(); }
-  else { lastTime = 0; dropCounter = 0; animId = requestAnimationFrame(loop); }
+  if (paused) {
+    timerElapsed += performance.now() - timerStart;
+    cancelAnimationFrame(animId); overlayPause();
+  } else {
+    timerStart = performance.now();
+    lastTime = 0; dropCounter = 0; animId = requestAnimationFrame(loop);
+  }
 }
 
 function loop(ts = 0) {
@@ -640,6 +660,7 @@ function loop(ts = 0) {
     if (valid(moved)) piece = moved; else lock();
   }
   draw();
+  updateTimer();
   animId = requestAnimationFrame(loop);
 }
 
@@ -653,6 +674,8 @@ function startGame() {
   dropInterval = 1000;
   dropCounter = 0;
   lastTime = 0;
+  timerElapsed = 0;
+  timerStart = performance.now();
   piece = randomPiece();
   nextPiece = randomPiece();
   running = true;
@@ -664,6 +687,7 @@ function startGame() {
 }
 
 function endGame() {
+  timerElapsed += performance.now() - timerStart;
   running = false;
   cancelAnimationFrame(animId);
   SFX.over();
