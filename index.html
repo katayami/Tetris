@@ -363,7 +363,8 @@ const board      = document.getElementById('board');
 const ctx        = board.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
 const nextCtx    = nextCanvas.getContext('2d');
-const NEXT_SIZE  = BLOCK * 3;
+const NEXT_SIZE    = BLOCK * 3;
+const PREVIEW_BLOCK = Math.floor(BLOCK * 0.75);
 
 board.width       = COLS * BLOCK;
 board.height      = ROWS * BLOCK;
@@ -532,12 +533,12 @@ function draw() {
   // Next piece
   nextCtx.fillStyle = THEME.bg;
   nextCtx.fillRect(0, 0, NEXT_SIZE, NEXT_SIZE);
-  const offX = Math.floor((3 - nextPiece.shape[0].length) / 2);
-  const offY = Math.floor((3 - nextPiece.shape.length) / 2);
+  const offX = Math.floor((4 - nextPiece.shape[0].length) / 2);
+  const offY = Math.floor((4 - nextPiece.shape.length) / 2);
   for (let r = 0; r < nextPiece.shape.length; r++)
     for (let c = 0; c < nextPiece.shape[r].length; c++)
       if (nextPiece.shape[r][c])
-        drawBlock(nextCtx, offX + c, offY + r, nextPiece.shape[r][c], BLOCK);
+        drawBlock(nextCtx, offX + c, offY + r, nextPiece.shape[r][c], PREVIEW_BLOCK);
 }
 
 function overlayPause() {
