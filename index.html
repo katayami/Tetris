@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Tetris</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -99,6 +101,69 @@
       transition: border-color 0.2s;
     }
     button:hover { border-color: #e0e0e0; }
+
+    /* ── Name input ──────────────────────────────────────────────────────── */
+    #player-name {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #444;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      letter-spacing: 2px;
+      text-align: center;
+      width: 180px;
+      padding: 4px 0;
+      outline: none;
+    }
+    #player-name::placeholder { color: #444; }
+    #player-name:focus { border-bottom-color: #888; }
+
+    button:disabled { opacity: 0.3; cursor: default; border-color: #333; }
+
+    /* ── Leaderboard overlay ─────────────────────────────────────────────── */
+    #leaderboard {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.92);
+      gap: 12px;
+      z-index: 20;
+    }
+    #leaderboard.hidden { display: none; }
+
+    #leaderboard h2 {
+      font-size: 14px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #e0e0e0;
+    }
+
+    #lb-table {
+      width: 260px;
+      border-collapse: collapse;
+    }
+    #lb-table td {
+      padding: 5px 8px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: #aaa;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    #lb-table td:first-child { color: #555; width: 24px; }
+    #lb-table td:last-child  { text-align: right; color: #e0e0e0; }
+    #lb-table tr.me td       { color: #e0e0e0; }
+    #lb-table tr.me td:last-child { color: #69f0ae; }
+
+    #lb-status {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: #444;
+      min-height: 16px;
+    }
 
     /* ── Mobile controls ─────────────────────────────────────────────────── */
     #mobile-controls {
@@ -229,6 +294,10 @@
       <div class="label">Sound</div>
       <div id="mute-btn" class="swatch mute-swatch active">♪</div>
     </div>
+    <div>
+      <div class="label">Top</div>
+      <div id="lb-btn" class="swatch mute-swatch" style="font-size:20px;">🏆</div>
+    </div>
   </div>
 </div>
 
@@ -241,8 +310,19 @@
 
 <div id="message">
   <h1 id="msg-title">Tetris</h1>
-  <p id="msg-sub">press space to start</p>
-  <button id="msg-btn">Start</button>
+  <input type="text" id="player-name" placeholder="твоё имя" maxlength="20" autocomplete="off" />
+  <p id="msg-sub"></p>
+  <button id="msg-btn" disabled>Start</button>
+</div>
+
+<div id="leaderboard" class="hidden">
+  <h2>Топ 10</h2>
+  <div id="lb-status">загрузка...</div>
+  <table id="lb-table"><tbody id="lb-body"></tbody></table>
+  <div style="display:flex;gap:12px;margin-top:4px;">
+    <button id="lb-restart" class="hidden">Restart</button>
+    <button id="lb-close">Закрыть</button>
+  </div>
 </div>
 
 <script>
@@ -529,6 +609,10 @@ function loop(ts = 0) {
 }
 
 function startGame() {
+  playerName = nameInput.value.trim();
+  if (!playerName) return;
+  localStorage.setItem('tetris_name', playerName);
+  hideLeaderboard();
   grid = createGrid();
   score = 0; lines = 0; level = 1;
   dropInterval = 1000;
@@ -548,10 +632,8 @@ function endGame() {
   running = false;
   cancelAnimationFrame(animId);
   SFX.over();
-  document.getElementById('msg-title').textContent = 'Game Over';
-  document.getElementById('msg-sub').textContent = `score: ${score}`;
-  document.getElementById('msg-btn').textContent = 'Restart';
-  document.getElementById('message').classList.remove('hidden');
+  submitScore(playerName, score).then(() => loadLeaderboard(playerName));
+  showLeaderboard(true);
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
@@ -682,6 +764,95 @@ function toggleMute() {
 }
 muteEl.addEventListener('click', toggleMute);
 muteEl.addEventListener('touchstart', e => { e.preventDefault(); toggleMute(); }, { passive: false });
+
+// ── Firebase ──────────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyBddViRdJjDOWzSVFjvBPDCg58geTUVevU",
+  authDomain: "tetris-leaderboard-540c8.firebaseapp.com",
+  projectId: "tetris-leaderboard-540c8",
+  storageBucket: "tetris-leaderboard-540c8.firebasestorage.app",
+  messagingSenderId: "470330596476",
+  appId: "1:470330596476:web:be8b4822446eb44c02fdf9"
+});
+const db = firebase.firestore();
+
+async function submitScore(name, newScore) {
+  if (!newScore) return;
+  const ref = db.collection('scores').doc(name);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    await ref.set({ score: newScore, date: new Date().toISOString() });
+  } else if (newScore > doc.data().score) {
+    await ref.update({ score: newScore, date: new Date().toISOString() });
+  }
+}
+
+async function loadLeaderboard(currentName) {
+  const statusEl = document.getElementById('lb-status');
+  const bodyEl   = document.getElementById('lb-body');
+  statusEl.textContent = 'загрузка...';
+  bodyEl.innerHTML = '';
+  try {
+    const snap = await db.collection('scores').orderBy('score', 'desc').limit(10).get();
+    statusEl.textContent = '';
+    snap.docs.forEach((doc, i) => {
+      const { score: s, } = doc.data();
+      const tr = document.createElement('tr');
+      if (doc.id === currentName) tr.className = 'me';
+      tr.innerHTML = `<td>${i + 1}</td><td>${doc.id}</td><td>${s}</td>`;
+      bodyEl.appendChild(tr);
+    });
+    if (snap.empty) statusEl.textContent = 'пока никого нет';
+  } catch {
+    statusEl.textContent = 'ошибка загрузки';
+  }
+}
+
+// ── Player name ───────────────────────────────────────────────────────────────
+let playerName = localStorage.getItem('tetris_name') || '';
+
+const nameInput = document.getElementById('player-name');
+const msgBtn    = document.getElementById('msg-btn');
+
+nameInput.value = playerName;
+msgBtn.disabled = !playerName.trim();
+
+nameInput.addEventListener('input', () => {
+  playerName = nameInput.value.trim();
+  msgBtn.disabled = !playerName;
+});
+nameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter' && playerName) startGame();
+});
+
+// ── Leaderboard open/close ────────────────────────────────────────────────────
+function showLeaderboard(afterGameOver = false) {
+  document.getElementById('lb-restart').classList.toggle('hidden', !afterGameOver);
+  document.getElementById('leaderboard').classList.remove('hidden');
+  loadLeaderboard(playerName);
+}
+function hideLeaderboard() {
+  document.getElementById('leaderboard').classList.add('hidden');
+}
+
+document.getElementById('lb-close').addEventListener('click', () => {
+  hideLeaderboard();
+  // если игра не запущена — показать стартовый экран
+  if (!running) document.getElementById('message').classList.remove('hidden');
+});
+document.getElementById('lb-restart').addEventListener('click', () => {
+  hideLeaderboard();
+  startGame();
+});
+document.getElementById('lb-btn').addEventListener('click', () => {
+  if (running && !paused) togglePause();
+  showLeaderboard();
+});
+document.getElementById('lb-btn').addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (running && !paused) togglePause();
+  showLeaderboard();
+}, { passive: false });
 
 // Init
 applyPalette();
