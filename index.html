@@ -306,6 +306,7 @@
   <div class="ctrl-btn" id="btn-rotate">↻</div>
   <div class="ctrl-btn" id="btn-down">▼</div>
   <div class="ctrl-btn" id="btn-right">▶</div>
+  <div class="ctrl-btn" id="btn-pause">⏸</div>
 </div>
 
 <div id="message">
@@ -679,6 +680,10 @@ function mobileAction(action) {
   el.addEventListener('mousedown',  e => { e.preventDefault(); mobileAction(action); });
 });
 
+const btnPause = document.getElementById('btn-pause');
+btnPause.addEventListener('touchstart', e => { e.preventDefault(); togglePause(); }, { passive: false });
+btnPause.addEventListener('mousedown',  e => { e.preventDefault(); togglePause(); });
+
 // Кнопка вниз — быстрое падение при зажатии
 let downInterval = null;
 function startDown() {
@@ -837,8 +842,11 @@ function hideLeaderboard() {
 
 document.getElementById('lb-close').addEventListener('click', () => {
   hideLeaderboard();
-  // если игра не запущена — показать стартовый экран
-  if (!running) document.getElementById('message').classList.remove('hidden');
+  if (!running) {
+    document.getElementById('message').classList.remove('hidden');
+  } else if (paused) {
+    togglePause(); // снимаем паузу
+  }
 });
 document.getElementById('lb-restart').addEventListener('click', () => {
   hideLeaderboard();
