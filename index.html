@@ -451,6 +451,7 @@ const SHAPES = [
 ];
 
 let grid, piece, nextPiece, score, lines, level, dropInterval, lastTime, animId, running, paused;
+let floatingTexts = [];
 let timerStart = 0, timerElapsed = 0;
 
 function formatTime(ms) {
@@ -516,7 +517,16 @@ function clearLines() {
   if (!cleared) return;
   SFX.clear(cleared);
   const pts = [0, 100, 300, 500, 800];
-  score += (pts[cleared] || 800) * level;
+  const gained = (pts[cleared] || 800) * level;
+  score += gained;
+  floatingTexts.push({
+    text: (cleared >= 4 ? 'TETRIS  ' : '') + '+' + gained,
+    x: (COLS / 2) * BLOCK,
+    y: (ROWS / 2) * BLOCK,
+    born: performance.now(),
+    duration: cleared >= 4 ? 1600 : 1100,
+    big: cleared >= 4,
+  });
   lines += cleared;
   level = Math.floor(lines / 10) + 1;
   dropInterval = Math.max(80, 1000 - (level - 1) * 90);
@@ -600,6 +610,8 @@ function draw() {
   // Next piece
   drawNextPiece(nextCtx);
   drawNextPiece(nextCtxOverlay);
+
+  drawFloatingTexts();
 }
 
 function drawNextPiece(ctx2d) {
@@ -622,6 +634,29 @@ function drawNextPiece(ctx2d) {
       if (nextPiece.shape[r][c])
         drawBlock(ctx2d, c, r, nextPiece.shape[r][c], PREVIEW_BLOCK);
   ctx2d.restore();
+}
+
+function drawFloatingTexts() {
+  const now = performance.now();
+  floatingTexts = floatingTexts.filter(ft => {
+    const t = (now - ft.born) / ft.duration;
+    if (t >= 1) return false;
+    const eased = 1 - t * t;
+    const alpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
+    const y = ft.y - t * BLOCK * 3.5;
+    const size = ft.big ? Math.round(BLOCK * 0.85) : Math.round(BLOCK * 0.65);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${size}px Nunito, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = ft.big ? '#F7C948' : '#ffffff';
+    ctx.fillText(ft.text, ft.x, y);
+    ctx.restore();
+    return true;
+  });
 }
 
 function overlayPause() {
@@ -676,6 +711,7 @@ function startGame() {
   lastTime = 0;
   timerElapsed = 0;
   timerStart = performance.now();
+  floatingTexts = [];
   piece = randomPiece();
   nextPiece = randomPiece();
   running = true;
