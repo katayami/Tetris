@@ -453,6 +453,11 @@ const SHAPES = [
 let grid, piece, nextPiece, score, lines, level, dropInterval, lastTime, animId, running, paused;
 let floatingTexts = [];
 let timerStart = 0, timerElapsed = 0;
+let clearAnim = null; // { rows, start, count, gained }
+const CLEAR_ANIM_MS = 350;
+let fallAnim = null; // { start, dy }
+const FALL_ANIM_MS = 130;
+let combo = 0;
 
 function formatTime(ms) {
   const s = Math.floor(ms / 1000);
@@ -502,35 +507,64 @@ function lock() {
       grid[ny][piece.x + c] = piece.shape[r][c];
     }
   SFX.lock();
-  clearLines();
-  piece = nextPiece;
-  nextPiece = randomPiece();
-  if (!valid(piece)) { endGame(); return; }
+
+  const fullRows = [];
+  for (let r = ROWS - 1; r >= 0; r--)
+    if (grid[r].every(v => v)) fullRows.push(r);
+
+  if (fullRows.length) {
+    combo++;
+    const pts = [0, 100, 300, 500, 800];
+    const base = (pts[fullRows.length] || 800) * level;
+    const bonus = combo > 1 ? (combo - 1) * 50 * level : 0;
+    SFX.clear(fullRows.length);
+    clearAnim = { rows: fullRows, start: performance.now(), count: fullRows.length, gained: base, bonus, combo };
+  } else {
+    combo = 0;
+    spawnNext();
+  }
 }
 
-function clearLines() {
-  let cleared = 0;
-  for (let r = ROWS - 1; r >= 0; ) {
-    if (grid[r].every(v => v)) { grid.splice(r, 1); grid.unshift(Array(COLS).fill(0)); cleared++; }
-    else r--;
-  }
-  if (!cleared) return;
-  SFX.clear(cleared);
-  const pts = [0, 100, 300, 500, 800];
-  const gained = (pts[cleared] || 800) * level;
-  score += gained;
+function spawnNext() {
+  piece = nextPiece;
+  nextPiece = randomPiece();
+  if (!valid(piece)) endGame();
+}
+
+function finishClear() {
+  const { rows, count, gained, bonus, combo: c } = clearAnim;
+  clearAnim = null;
+  rows.forEach((r, k) => { grid.splice(r + k, 1); grid.unshift(Array(COLS).fill(0)); });
+  score += gained + bonus;
   floatingTexts.push({
-    text: (cleared >= 4 ? 'TETRIS  ' : '') + '+' + gained,
+    text: (count >= 4 ? 'TETRIS  ' : '') + '+' + gained,
     x: (COLS / 2) * BLOCK,
     y: (ROWS / 2) * BLOCK,
     born: performance.now(),
-    duration: cleared >= 4 ? 1600 : 1100,
-    big: cleared >= 4,
+    duration: count >= 4 ? 1600 : 1100,
+    big: count >= 4,
   });
-  lines += cleared;
+  if (c > 1) {
+    floatingTexts.push({
+      text: 'COMBO ×' + c + '  +' + bonus,
+      x: (COLS / 2) * BLOCK,
+      y: (ROWS / 2) * BLOCK + BLOCK * 1.4,
+      born: performance.now(),
+      duration: 1300,
+      big: false,
+      color: '#F4A623',
+    });
+  }
+  lines += count;
   level = Math.floor(lines / 10) + 1;
   dropInterval = Math.max(80, 1000 - (level - 1) * 90);
   updateUI();
+  fallAnim = { start: performance.now(), dy: count * BLOCK, staticFrom: rows[0] + 1 };
+}
+
+function finishFall() {
+  fallAnim = null;
+  spawnNext();
 }
 
 function updateUI() {
@@ -595,17 +629,45 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(0, r * BLOCK); ctx.lineTo(board.width, r * BLOCK); ctx.stroke();
   }
 
-  // Locked blocks
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
-      if (grid[r][c]) drawBlock(ctx, c, r, grid[r][c], BLOCK);
+  // Locked blocks (with fall animation offset)
+  if (fallAnim) {
+    const t = Math.min(1, (performance.now() - fallAnim.start) / FALL_ANIM_MS);
+    const ease = 1 - Math.pow(1 - t, 2);
+    const offset = fallAnim.dy * (1 - ease);
+    // Blocks below the cleared rows — don't move
+    for (let r = fallAnim.staticFrom; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (grid[r][c]) drawBlock(ctx, c, r, grid[r][c], BLOCK);
+    // Blocks above — animate falling
+    ctx.save();
+    ctx.translate(0, -offset);
+    for (let r = 0; r < fallAnim.staticFrom; r++)
+      for (let c = 0; c < COLS; c++)
+        if (grid[r][c]) drawBlock(ctx, c, r, grid[r][c], BLOCK);
+    ctx.restore();
+  } else {
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (grid[r][c]) drawBlock(ctx, c, r, grid[r][c], BLOCK);
+  }
 
-  drawGhost();
+  // Clear animation flash
+  if (clearAnim) {
+    const t = (performance.now() - clearAnim.start) / CLEAR_ANIM_MS;
+    const flash = Math.floor(t * 7) % 2 === 0;
+    ctx.fillStyle = flash ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.15)';
+    for (const r of clearAnim.rows)
+      ctx.fillRect(0, r * BLOCK, COLS * BLOCK, BLOCK);
+  }
 
-  // Active piece
-  for (let r = 0; r < piece.shape.length; r++)
-    for (let c = 0; c < piece.shape[r].length; c++)
-      if (piece.shape[r][c]) drawBlock(ctx, piece.x + c, piece.y + r, piece.shape[r][c], BLOCK);
+  if (!clearAnim && !fallAnim) {
+    drawGhost();
+
+    // Active piece
+    for (let r = 0; r < piece.shape.length; r++)
+      for (let c = 0; c < piece.shape[r].length; c++)
+        if (piece.shape[r][c]) drawBlock(ctx, piece.x + c, piece.y + r, piece.shape[r][c], BLOCK);
+  }
 
   // Next piece
   drawNextPiece(nextCtx);
@@ -652,7 +714,7 @@ function drawFloatingTexts() {
     ctx.font = `800 ${size}px Nunito, sans-serif`;
     ctx.shadowColor = 'rgba(0,0,0,0.45)';
     ctx.shadowBlur = 8;
-    ctx.fillStyle = ft.big ? '#F7C948' : '#ffffff';
+    ctx.fillStyle = ft.color || (ft.big ? '#F7C948' : '#ffffff');
     ctx.fillText(ft.text, ft.x, y);
     ctx.restore();
     return true;
@@ -688,12 +750,20 @@ function loop(ts = 0) {
   if (!running) return;
   const delta = ts - lastTime;
   lastTime = ts;
-  dropCounter += delta;
-  if (dropCounter >= dropInterval) {
-    dropCounter = 0;
-    const moved = { ...piece, y: piece.y + 1 };
-    if (valid(moved)) piece = moved; else lock();
+
+  if (clearAnim) {
+    if ((ts - clearAnim.start) >= CLEAR_ANIM_MS) finishClear();
+  } else if (fallAnim) {
+    if ((ts - fallAnim.start) >= FALL_ANIM_MS) finishFall();
+  } else {
+    dropCounter += delta;
+    if (dropCounter >= dropInterval) {
+      dropCounter = 0;
+      const moved = { ...piece, y: piece.y + 1 };
+      if (valid(moved)) piece = moved; else lock();
+    }
   }
+
   draw();
   updateTimer();
   animId = requestAnimationFrame(loop);
@@ -712,6 +782,9 @@ function startGame() {
   timerElapsed = 0;
   timerStart = performance.now();
   floatingTexts = [];
+  clearAnim = null;
+  fallAnim = null;
+  combo = 0;
   piece = randomPiece();
   nextPiece = randomPiece();
   running = true;
