@@ -813,7 +813,7 @@ document.addEventListener('keydown', e => {
   if      (e.key === 'ArrowLeft'  || e.code === 'KeyA') { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} }
   else if (e.key === 'ArrowRight' || e.code === 'KeyD') { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} }
   else if (e.key === 'ArrowDown'  || e.code === 'KeyS') {
-    const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0;
+    if (!clearAnim && !fallAnim) { const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0; }
   } else if (e.key === 'ArrowUp'  || e.code === 'KeyW') {
     const rot=rotate(piece.shape);
     let m={...piece,shape:rot};
@@ -822,8 +822,7 @@ document.addEventListener('keydown', e => {
     if(valid(m)){piece=m;SFX.rotate();}
   } else if (e.key === ' ') {
     e.preventDefault();
-    while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1};
-    lock(); dropCounter=0;
+    if (!clearAnim && !fallAnim) { while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; }
   }
 });
 
@@ -834,7 +833,7 @@ function mobileAction(action) {
   if (!running || paused) return;
   if (action === 'left')   { const m={...piece,x:piece.x-1}; if(valid(m)){piece=m;SFX.move();} draw(); }
   if (action === 'right')  { const m={...piece,x:piece.x+1}; if(valid(m)){piece=m;SFX.move();} draw(); }
-  if (action === 'down')   { const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0; draw(); }
+  if (action === 'down')   { if (!clearAnim && !fallAnim) { const m={...piece,y:piece.y+1}; if(valid(m)) piece=m; else lock(); dropCounter=0; draw(); } }
   if (action === 'rotate') {
     const rot=rotate(piece.shape); let m={...piece,shape:rot};
     if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)){piece=m;SFX.rotate();} draw();
@@ -875,7 +874,7 @@ board.addEventListener('touchend', e=>{
     const rot=rotate(piece.shape); let m={...piece,shape:rot};
     if(!valid(m)) m={...m,x:m.x-1}; if(!valid(m)) m={...m,x:m.x+2}; if(valid(m)) piece=m;
   } else if(ax>ay){ const m={...piece,x:piece.x+(dx>0?1:-1)}; if(valid(m)) piece=m; }
-  else if(dy>30){ while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; }
+  else if(dy>30){ if (!clearAnim && !fallAnim) { while(valid({...piece,y:piece.y+1})) piece={...piece,y:piece.y+1}; lock(); dropCounter=0; } }
 }, {passive:true});
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
