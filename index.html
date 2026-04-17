@@ -806,6 +806,7 @@ function endGame() {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  if (document.activeElement === nameInput) return;
   if (e.code === 'KeyR') { startGame(); return; }
   if (e.key === 'Escape') { togglePause(); return; }
   if (!running || paused) return;
